@@ -7,6 +7,17 @@ Learning Pytorch and Juniper Notebooks is a must
 May of these concepts haven't changed in a long time
 Math is math, and this is math.
 Learning core fundamentals of ML will make learning ML in the future much easier, but it does take time because it is A LOT
+NumPy is for the CPU and Torch is for the GPU
+Everything is a function, it doesn't matter how many models make up something, it just makes up a bigger function. Attackers need to care about inputs/outputs.
+
+# Need to learn
+Dataset
+- A torch Dataset is simply a Python class that inherits from `torch.utils.data import Dataset`, and implements __init__, __len__, and __getitem__.
+.reshape - Learn about reshape
+Z.reshape(-1) works, but seems to not care about what negative is there
+Typically use Z.reshape(1,-1), this uses what is called an unknown value (-1)
+np.moveaxis(<variable>,0,-1) = does a reshape on the existing variable image dimensions
+what is a NaN? NaNs are a special value that indicate an undefined or unrepresentable value. NaN could be the result of a parsing error or be used to represent invalid operations like 0/0, ∞ - ∞. Libraries usually provide mechanisms to gracefully handle potential NaNs in code instead of outright crashing.
 
 # Lab 1 Notes
 
@@ -161,6 +172,8 @@ p(x)=
  
 If we're talking about grades, we might be looking at pass-fail scores; maybe it's curved so that half the class (those with scores above the median) passes and the rest fail.
 
+BayesianRidge - need to know what this is
+
 
 
 # Lab 2 Notes - Neural Networks
@@ -230,13 +243,160 @@ ML Evasion requires:
 4. While preserving some intrinsic property of the sample
 Kind of sample/ML model/Model result/Preserved Property
 
+the process for evading a model is the same across pretty much all modalities -
+
+Content filters: the useful property might be getting phish past a classifier, while the machine learning system being evaded is a spam filter.
+Facial Recognition: You wear a mask that obfuscates your face
+Sentiment classifiers: It looks like a positive review to a human, but a scathing condemnation to the model.
+Malware detector: The ML model labels a malicious file as benign despite it executing the same malicious functionality.
+
+When you're attacking models, access typically comes in one of three flavors:
+
+Gradient Access: You have complete access to the model, either by stealing it, or by the victim using a pretrained model that you have identified and found your own copy of on say, HuggingFace. In this case, you can use Whitebox gradient-based attacks. These attacks use the weights (parameters of the model).
+Scores: You have API access to the model which provides complete numerical outputs of the model. In this case, you can use methods that estimate the gradients from the scores, {"class_0: "0.89, class_1: 0.06, class_2: 0.049, class_3: 0.01}. These attacks use "soft" labels, or probabilities from the output.
+Labels: You have API access to the model that only returns the label of the input (or, occasionally, the top 5 or so labels). In this case, you are often forced to use noisier techniques that estimate gradients based on sampling. [class_0, class_1, class_2, class_3]. These are "hard" labels, and represent the represent the most difficult targets, with [class_0, class_1] theoretically being the most difficult. Some algorithms (like HopSkipJump) can use any access.
+
+unnormalize (NEED TO LEARN MORE ABOUT THIS) - this function takes an input image tensor that has been preprocessed for our model and reverses the preprocessing steps to return the original image such that we can view, save, and look at it with our human eyes.
+
+The reason is looks like it does, is because torch doesn't have an UnNormalize function. Fortunately, we can still recover our original image by reversing the normalization operation performed during preprocessing. This is done by multiplying the image tensor with the standard deviation and adding the mean values for each channel.
+
+The unsqueeze function creates a batch dimension, which is effectively an index to a sample. For example, img_tensor[0] is simply the image we loaded as a tensor of shape (3, 224, 224). Because we train or predict on a lot of samples at once, remembering to create a batch dimension is important. But don't worry, torch will yell at you if you get it wrong.
+
+Some attacks are built for specific modalities, for example,
+
+Attack	Modality	Label
+PixelAttack	Images	Soft
+DeepWordBug	Text	Any
+HopSkipJump	Any	Any
+But most models, so long as you get the shapes and dtypes right will give you back a prediction.
+
+```
+# Code sample of an attack:
+    output = model(img_tensor+mask_parameter)
+    total_loss, class_loss, l2_loss = loss_function(output, mask_parameter, current_index)
+
+    optimizer.zero_grad()
+    total_loss.backward()
+    optimizer.step()
+
+    print("Total loss: {:4.4f}    class loss:{:4.4f}     l2 loss: {:4.4f}   Predicted class index:{}".format(
+        total_loss.item(), class_loss.item(), l2_loss.item(), output[0].argmax()
+    ))
+
+```
+
 The goal is to keep the intrinsic property (human still sees the real value, like a bus), but the model thinks differently (an ostrich)
+
+Finding evasions is similiar across all inputs
+1. We just need to figure out how they represent inputs as numbers
+2. Define success
+
+3 different attacks
+- Whitebox - You have complete access to the model, either by stealing it or by the victim using a pretrained model that you have identified.
+- Graybox - You have API access to the model which provides complete numerical outputs of the model. In this case, you can use methods that estimate the gradients from the scores.
+- Blackbox - You hae API access to the model that only returns the label of the input. In this case, you're often forced to use noisier techniques.
+
+Decision boundary
+Adversarial pertuberation
+
+### HopSkipJump
+1. Find something, ANYTHING, on the target side of the decision boundary.
+2. Use our starting image, and what we just found as "anchors" to find a point on the decision boundary between them.
+3. Use some fancy math (what) to estimate the gradient at the decision boundary. Jump from the point on the decision boundary
+
+HopSkipJump by Hand
+The previous examples all relied on being able to compute or estimate model gradients based on probalisitic outputs to find an extremely efficient adversarial perturbations extremely quickly. In practice however, we're often attacking a model on the other side of an API and only get labels (no scores or probabilities), dog, cat, sheep, parrot, etc. In this case, there are better algorithms to choose - The most widely used one is "HopSkipJump" (if only because we tend to use it the most) -- the details of this approach are complex, but the general plan of attack is as follows:
+
+Add random noise to get any kind of misclassification -- alternatively, use a second image.
+Interpolate between the images until you find the mask that just barely changes your starting image to the new class.
+Estimate the best direction to go to increase the misclassification strength; "jump" in that direction to create a new second image.
+Repeat step 2 and 3 until you get a stable result.
+
+Bisection search (what is this?)
+
+Takeaways:
+- Everything is optimizable: your model, inputs, etc
+- We don't know the decision boundary
+- The key weakness in most ML models is that the space of possible inputs is huge relative to the space of training and test data. There are always gaps. Exploit them.
+- There are more types of evasion attacks than adversarial images, like text
+
+# Extraction
+Build a "functionally equivalent" (you define this) copy of the target model.
+Extraction is where you get to be a data scientist.
+- What data and features do you care about?
+- What accuracy/uncertainty metrics do you care about?
+- How are you going to generate/collect/augment that data?
+- When are you done?
+
+General Pattern
+- Identify target
+- Generate/collect training data
+    - Separates the pros from the joes
+    - Do you need your proxy to approximate the target across the entire feature space?
+- Use a victim model to label the training data
+- Use the labels from the model  to train your proxy model
+    - What if we used these ad feedback for Step 2
+
+Tradecraft
+- What data are you using to generate labels?
+- What auth model does the target have and what does that mean for detection?
+- Ensembles, do you care?
+- Data wrangling
+- Model versioning and testing
+- What if they target is ensembled or evolving? A/B tests?
+
+Doing the basics
+- Get good with working with data
+- Understand features, how they're distributed, and how they relate (especially to your target variable)
+    - Correlation is an easy way to do this.
+- Your data is almost always multidimensional, but data visualization is best done in 2/3D. What can you do?
+    - Having a mental model for how your data is distributed
+- How can unsupervised learning help?
+
+Unsupervised learning and dimension reduction
+- Uncovers structure in data = don't need labels
+- Often, just think "fancy clustering"
+- Common approaches
+    - K-means clustering
+    - PCA (Principal component analysis)
+        ```
+        from sklearn.decomposition import PCA
+        ```
+    - T-SNE (mostly for visualization)
+    - Hierarchical clustering
+
+Extraction needs 3 things:
+1. The ability to submit inputs and observe outputs (we need feedback to learn from): Attacks in the wild are difficult if only because getting direct access to inputs and outputs is not a given. In this lab setting we have all the information we could possibly need to ensure success. We get clean logits on the output, we have access to weights, we know exactly what features the model requires. In this regard, the experiment we have set up is our "best case" scenario. However, in most cases you will interact with systems that require to upload an image of bytes, not a vector. Or did you notice that we've been working in batches of 10 (torch.FloatTensor(10, 1, 28, 28))? Not all applications support batches, meaning you need to come up with your own batching scheme.
+
+2. A representative dataset for the target model to label: We've established that models will normally provide outputs even if the inputs aren't relevant. But when it comes to extracting a model, it's important to understand that you aren't extracting the exact model, you are simply modeling a model. Suppose you had access to a random 50% of the training data - how accurate would your copy-cat model be relative to the target model (trained on 100%)? Probably not as good without some careful modeling, and how would you know anyway? Or what do you think a copy-cat model would learn about other classes if you only had training data for a 7? Find a dataset that will give you accurate insights for the task you want to perform.
+
+3. A model architecture that is useful and relevant to creating the outputs we want: You probably don't need the latest and greatest architecture, and you definitely don't need ChatGPT (though it can be used to collect a dataset - Alpaca style). Understand that algorithms are tools, each with its own purpose and reason for existing. Mathematics even has a theorem for this concept - there is "no free lunch". It's the idea that there is no one-size-fits-all algorithm or optimization strategy that works best for every problem. The "no free lunch" theorem states that any two optimization algorithms are equivalent when their performance is averaged across all possible problems. This means that there is no one algorithm that can outperform all others on every problem. Instead, the most effective algorithm for a particular problem depends on the specific characteristics of that problem. So like, experiment. A lot.
+
+To do this we will send samples to the target model and collect outputs, then store them as a new dataset. We'll randomly sample images from the representative dataset, and we will cap target model queries with a query_budget constraint. This dataset will be what we use to train the copy-cat. We will create a custom torch Dataset, which is a fairly straight forward process. A torch Dataset is simply a Python class that inherits from torch.utils.data import Dataset, and implements __init__, __len__, and __getitem__.
+
+# Model Extraction
+
+- Do you want to know what the model thinks about cats? Send it pictures of all kinds of different cats.
+- Do you want to know what the model thinks about malware? Send it all different kinds of malware.
+- Do you want to know what the model thinks about X? Send it ~X.
+There are some higher level strategies about what from your dataset you send first. For example, you could send a starting input, then measure the distance between that sample and everything else and choose, let's say, the next sample that is furthest away. This would ensure you're not sending similar samples and only learning about those from the model. This is anecdotal, but it seems that a more diverse dataset generally leads a more diverse set of observations to learn from. But when running an extraction attack you should consider the types of outputs you can receive (or the heuristic measures you could put in place),
+
+- The worst case scenario is that the target returns a binary value like 0 or 1 (which could mean execution or not).
+- The best case is scenario is the target product returns a continuous value, a value between 0 and 1 (or probabilities)
+
+You will start to get a feel for the process and you analyze more and more datasets, but a lot of EDA (and model building) is cleaning data, and figuring out what's worth your time to analyze.
+
+Once you start transforming data, try to write idempotent code. That's a fancy word that means "no matter how many times you execute this, you'll always get the same result." For example, we could have written the drop with something like df.drop(columns=["phishscore", "imposterscore"]), but after you've executed that code once any subsequent execution would result in an error (because those columns wouldn't exist anymore). Instead, by writing functional and idempotent code, we can execute the above cell any number of times while maintaining correct output. Idempotent data transformations will save you a lot of time and headaches.
 
 
 Relevant Links:
 - http://websocketstest.courses.nvidia.com - Check on the browser and plugins for compatibility
 - learn.nvidia.com - main site
 - http://matrixmultiplication.xyz - for reviewing matrix multiplication
+- https://github.com/carlini/nn_robust_attacks/blob/master/l2_attack.py
+- https://arxiv.org/abs/1905.07121
+- https://crfm.stanford.edu/2023/03/13/alpaca.html
+
 
 ## Lab: Basic Modeling
 1. Explore data structures and some reshaping

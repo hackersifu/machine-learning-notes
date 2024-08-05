@@ -1,3 +1,4 @@
+# Install matplotlib using pip3 prior to this
 from matplotlib import pyplot as plt
 import numpy as np
 
