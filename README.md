@@ -22,6 +22,8 @@ Describe what shape and reshape are in machine learning.
 Describe what normalize and unnormalize are in machine learning.
 Gradient Descent
 What is `torch.clamp`?
+Describe what squeeze and unsqueeze are in machine learning.
+Describe how to use `import matplotlib.pyplot as plt` properly in machine learning.
 
 # Need to learn
 Dataset
@@ -470,9 +472,62 @@ Inversion is searching for a representation of the training data.
     - Etc
 2. Gradient descent to optimize the image 
 
+#### MIFace
 The MIFace attack was originally developed for facial recognition systems, where an image of a person that the classifier was trained on could be recovered. In practice, this works best for models (like facial recognition) where the examples for each class look very similar to each other. In ML terms, model inversion works best when the model is 'overfit' to a particular class, meaning it has effectively memorized it.
 
 MIFace is an attack which allows us to invert a model that takes in an image and outputs a label. The attack itself is very similar to what we did above: we specify a model and an output and train the input to match that output. But just like training a model, the attack calculates gradients in order to determine how best to modify the input in order to provide the best output. As you may be noticing this also means that the attack requires access to the model's weights and won't work on a black box.
+
+MIFace Template script:
+```
+classifier = PyTorchClassifier(model=model, 
+                                # YOUR CODE HERE!
+                              )
+
+y = torch.tensor([0,1,2,3,4,5,6,7,8,9])
+
+attack = MIFace(classifier, 
+                # YOUR CODE HERE!
+               )
+
+x_train_infer = # YOUR CODE HERE! Make sure your final shape is (10, 1, 28, 28)
+
+x_train_infer = attack.infer(x=x_train_infer, y=y)
+
+
+# plotting boilerplate
+fig = plt.figure(figsize=(12,4))
+for i in range(10):
+    plt.subplot(2,5,i+1)
+    plt.imshow(x_train_infer[i,0], cmap='gray')
+```
+
+MIFace Example Script:
+```
+classifier = PyTorchClassifier(model=model, 
+                                clip_values=[0,1],
+                               loss=F.cross_entropy,
+                               input_shape=(1,1,28,28),
+                               nb_classes=10
+                              )
+
+y = torch.tensor([0,1,2,3,4,5,6,7,8,9])
+
+attack = MIFace(classifier, 
+                max_iter=100,
+                learning_rate = 0.1
+               )
+
+x_train_infer = np.zeros((10,1,28,28))
+
+x_train_infer = attack.infer(x=x_train_infer, y=y)
+
+
+# plotting boilerplate
+fig = plt.figure(figsize=(12,4))
+for i in range(10):
+    plt.subplot(2,5,i+1)
+    plt.imshow(x_train_infer[i,0], cmap='gray')
+```
 
 
 The general method of attack for all these issues is the same, and should be a bit reminiscent of generating an adversarial example. If we think that the model is overfit on a specific image, then it should respond with a very strong classification for that input. If we hunt through the space of images to find one that elicits a strong repsonse from the model, then there's a good chance that maps to a training image.
@@ -489,6 +544,38 @@ x_optimizer = torch.optim.Adam([x]) # change this (some code in the torch lab mi
 target = torch.tensor([0])
 ```
 
+# Module 6 - Poisoning
+From a Rules of Engagement stance, poisioning data can be dangerous, and not to be tested lightly (think FSD).
+Takes less than 1% to poison data.
+
+More than some other attacks, poisoning takes scale
+- More data
+- More epochs
+- More time
+- Potentially more access
+Depending on your visibility into the training process, your data will probably be modified before used in training
+
+The canonical training time attack is data poisoning. Poisoning is an attack that requires access to training data. This could be through network access or some other vector. The end goal is basically to influence the training of the model such that you gain a desired outcome some high percentage of the time.
+
+Below is a way that someone may load the MNIST data. In PyTorch, a DataLoader contains the same functions you might see in a production Extract, Transform, Load (ETL) pipeline. The data is extracted from a web host or local directory, it's transformed using any functions you provide (in this case, converting to tensors), and loaded into batches and an iterator. In a less trivial example, the data may be extracted from a data warehouse, transformed by enriching it with other data sources, and loaded into a pub/sub queue.
+
+#### Witch's Brew
+Witches Brew is a poisoning attack that came out in 2021. It targets the reclassification of an unmodified test image. From the paper: "the central mechanism of the new attack is matching the gradient direction of the malicious sample." Basically, we're building an attack around the fact that gradient descent is a crucial part of training. We structure the training problem so that reducing training loss also reduces adversarial loss (a loss function mapping the success of our adversarial attack) -- aligning their gradients.
+
+Witches Brew is more efficient and robust than preexisting attacks under similar constraints. "The attack successfully compromises a ResNet-34 by manipulating 0.1% of the data points with perturbations less than 8 pixel values in linf-norm... Strong differential privacy is the only existing defense that can partially mitigate the effects of the attack."
+
+Tradecraft
+Witches Brew has some nice tradecraft properties:
+
+Clean Label: This is a class of "clean-label" attacks, meaning that while we can modify data bits, we don't modify the labels. This is an important element of tradecraft; Witches Brew is a "clean label" attack. The easiest way to solve the MNIST exercise above is by modifying image labels, but that is easily detected with human supervision and inspection. By contrast, a clean label attack doesn't change the image labels and therefore can bypass manual human inspection.
+Survives Data Augmentation: In many ML contexts, each training datapoint is augmented to improve the robustness of the final model. Images might be cropped, rotated, flipped, and skewed, for example. Witches Brew is relatively robust to these augmentations because it performs data augmentation for each poisoned image. This also improves the transferability of the attack between models.
+Does not require perfect knowledge of training procedures: The attacker does not need to know about the victim's model initialization, batches, or data augmentation steps.
+Does not require access to all training data: Usually requires less than 1% of the training data and no access to validation data.
+No apparent impact to training/validation accuracy: Reduces the chances of detection during training or potential accuracy degredations launching promotions to production.
+Successful when model trained from scratch or finetuned: Previous methods (like Poison Frogs) only work in finetuning settings.
+Gradient matching is efficient: While it does require a set of trained parameters, generating poisoned images doesn't require training a classifier. This reduces attack cost significantly. "Poisoning ImageNet for a ResNet-18 with MetaPoison would take 500 GPU days vs 4 GPU hours for Witches Brew."
+
+
 ## Relevant Links:
 - http://websocketstest.courses.nvidia.com - Check on the browser and plugins for compatibility
 - learn.nvidia.com - main site
@@ -497,6 +584,8 @@ target = torch.tensor([0])
 - https://arxiv.org/abs/1905.07121
 - https://crfm.stanford.edu/2023/03/13/alpaca.html
 - https://developer.nvidia.com/blog/nvidia-ai-red-team-an-introduction
+- https://adversarial-robustness-toolbox.readthedocs.io/en/latest/modules/estimators/classification.html#pytorch-classifier
+- https://arxiv.org/abs/2302.10149
 
 
 ## Lab: Basic Modeling
