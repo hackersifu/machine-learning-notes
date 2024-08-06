@@ -15,6 +15,13 @@ AI Security is really Application Security
 ML is hard! Have empathy for the process and knowledge. ML folks have worked hard.
 If you don't want PII in your model, don't put it into the model!
 - Just because you found it publicly, doesn't mean it should be.
+Review models on HuggingFace! Are you testing against a known model?
+
+# Notes to feed ChatGPT
+Describe what shape and reshape are in machine learning.
+Describe what normalize and unnormalize are in machine learning.
+Gradient Descent
+What is `torch.clamp`?
 
 # Need to learn
 Dataset
@@ -431,10 +438,58 @@ def predict(x):
 
     resp.json()["labels"]
     return output
+```
+
+As a reminder (from the extraction lab), inputs is a dictionary of mutiple arrays that make up a single sample. This is a key difference between image classifiers amd text models or generative models.
+
+The keys represents:
+
+input_ids: These are the tokenized representations of the input text. Each integer represents a specific token in the model's vocabulary. For instance, in your example, the input_ids tensor includes the tokens for a specific sentence. The numbers 101 and 102 are special tokens, representing the start ([CLS]) and end ([SEP]) of a sequence, respectively.
+token_type_ids: These are used in models that need to understand two separate sentences and how they interact (for example, in a question-answering model or a next-sentence prediction model). They differentiate between the two sentences. In this case, all the token_type_ids are 0, meaning that all the tokens belong to the same sentence. If there were two sentences, you'd see a sequence of 0s (for the first sentence) followed by a sequence of 1s (for the second sentence).
+attention_mask: This is used to specify which tokens should be attended to by the model, and which should be ignored. A value of 1 means the token should be attended to, and a value of 0 means the token should be ignored. This is usually used when we have padded sequences (to make all inputs the same length) and we want the model to ignore the padding tokens. In your example, all values in the attention_mask tensor are 1, which indicates that all tokens in input_ids should be considered by the model.
+These "extra" inputs are effectively just a way for us to provide a model contextual information. But they also represent an attack surface!
+
+### Text Attack
+Like ART, TextAttack requires input data to be structured a particular way, a list of tuples where each tuple consists of (input, label) and stored in a Dataset class, which is mostly just a container.
+
+Instead of the predict function that we used in ART, TextAttack uses the __call__ method to query a model. Otherwise, the mechanics are the same.
 
 - Optuna (as an attack)
 
-Relevant Links:
+
+# Module 5 - Inversion
+Inversion is the process of inverting a model in order to get a representation of the training data. Sometimes this is a 1:1 match for what the training data is, however, that is rare. It's best to imagine a model as a lossy compression algorithm. It contains a portion of the training data that it was trained on, however the trick is figuring out how to extract it and in practice, this is actually quite a difficult attack to execute. Not only does it take a ton of queries, but you never actually get training data - only a representation of it... at least for images. 
+These attacks don't always work all the time.
+- Although they're cooler attacks, they're not always effective, and sometimes hard.
+Inversion is searching for a representation of the training data.
+
+### Manual Inversion
+1. Start with anything.
+    - Solid color image
+    - Random noise
+    - Etc
+2. Gradient descent to optimize the image 
+
+The MIFace attack was originally developed for facial recognition systems, where an image of a person that the classifier was trained on could be recovered. In practice, this works best for models (like facial recognition) where the examples for each class look very similar to each other. In ML terms, model inversion works best when the model is 'overfit' to a particular class, meaning it has effectively memorized it.
+
+MIFace is an attack which allows us to invert a model that takes in an image and outputs a label. The attack itself is very similar to what we did above: we specify a model and an output and train the input to match that output. But just like training a model, the attack calculates gradients in order to determine how best to modify the input in order to provide the best output. As you may be noticing this also means that the attack requires access to the model's weights and won't work on a black box.
+
+
+The general method of attack for all these issues is the same, and should be a bit reminiscent of generating an adversarial example. If we think that the model is overfit on a specific image, then it should respond with a very strong classification for that input. If we hunt through the space of images to find one that elicits a strong repsonse from the model, then there's a good chance that maps to a training image.
+
+Membership inference
+
+The pytorch `state_dict` produces a dictionary where keys are parameter names, and values are the values of those parameters. These can be inspected for a model via model.state_dict() and loaded into a model (with checks to make sure that the keys match between the model and the dictionary being loaded) via model.load_state_dict().
+```
+# provided code
+
+x = nn.Parameter(torch.ones(1,1,28,28)*.5)
+x_optimizer = torch.optim.Adam([x]) # change this (some code in the torch lab might be helpful here
+
+target = torch.tensor([0])
+```
+
+## Relevant Links:
 - http://websocketstest.courses.nvidia.com - Check on the browser and plugins for compatibility
 - learn.nvidia.com - main site
 - http://matrixmultiplication.xyz - for reviewing matrix multiplication
