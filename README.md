@@ -9,6 +9,12 @@ Math is math, and this is math.
 Learning core fundamentals of ML will make learning ML in the future much easier, but it does take time because it is A LOT
 NumPy is for the CPU and Torch is for the GPU
 Everything is a function, it doesn't matter how many models make up something, it just makes up a bigger function. Attackers need to care about inputs/outputs.
+Typically, Security follows frameworks/steps/etc. AI Security follows no such model.
+Finding eval is fun as a pentester (code execution)
+AI Security is really Application Security
+ML is hard! Have empathy for the process and knowledge. ML folks have worked hard.
+If you don't want PII in your model, don't put it into the model!
+- Just because you found it publicly, doesn't mean it should be.
 
 # Need to learn
 Dataset
@@ -18,6 +24,7 @@ Z.reshape(-1) works, but seems to not care about what negative is there
 Typically use Z.reshape(1,-1), this uses what is called an unknown value (-1)
 np.moveaxis(<variable>,0,-1) = does a reshape on the existing variable image dimensions
 what is a NaN? NaNs are a special value that indicate an undefined or unrepresentable value. NaN could be the result of a parsing error or be used to represent invalid operations like 0/0, ∞ - ∞. Libraries usually provide mechanisms to gracefully handle potential NaNs in code instead of outright crashing.
+Learn what TfidVectorizer is `from sklearn.feature_extraction.text import TfidfVectorizer`
 
 # Lab 1 Notes
 
@@ -388,6 +395,44 @@ You will start to get a feel for the process and you analyze more and more datas
 
 Once you start transforming data, try to write idempotent code. That's a fancy word that means "no matter how many times you execute this, you'll always get the same result." For example, we could have written the drop with something like df.drop(columns=["phishscore", "imposterscore"]), but after you've executed that code once any subsequent execution would result in an error (because those columns wouldn't exist anymore). Instead, by writing functional and idempotent code, we can execute the above cell any number of times while maintaining correct output. Idempotent data transformations will save you a lot of time and headaches.
 
+In the next cell, we define a term-frequency * inverse document frequency (tfidf) vectorizer. This looks at how frequently terms occur and punishes things that occur too often (because they don't carry information that help with our machine learning task). This scikit-learn function also has some handy arguments to reduce our feature space like removing stop words and words that don't occur more than a certain frequency. Note that we didn't tokenize first, so "learn" and "learning" will be vectorized separately.
+
+# Assessments
+New concerns
+- Ethics and safety - Trustworthy ML/Responsible AI
+- Not the same as other technologies - Responsible use of Win32
+- At a technical level, it's kind of all the same. What outcome do you want to optimize for?
+    - A security issue?
+    - A safety issue?
+    - A trust issue?
+- Where is your organization today?
+    - If they have no idea, maybe you need consultations.
+    - These risk may be new to them
+    - What tools and skills do you already have?
+- There are likely lots of issues, help develop priorities
+- Security controls impact velocity + Many AI/ML research ideas never make it to production
+
+ML stated at "red teaming", but still haven't done some of the most basic stuff:
+- Pickles, eval/exec, no auth mechanisms
+- Data collected straight from the internet and through straight into a model, with zero validation or controls
+- ZERO pre-deployment testing (even ChatGPT)
+- Red Teaming LLMs is popular, but to what end?
+- Logging and monitoring on models? Nope
+
+Tools!
+- Adversarial Robustness Toolbox
+- TextAttack
+- Alibi
+
+Wrap the predict function!
+```
+def predict(x):
+    resp = "https://"
+
+    resp.json()["labels"]
+    return output
+
+- Optuna (as an attack)
 
 Relevant Links:
 - http://websocketstest.courses.nvidia.com - Check on the browser and plugins for compatibility
@@ -396,6 +441,7 @@ Relevant Links:
 - https://github.com/carlini/nn_robust_attacks/blob/master/l2_attack.py
 - https://arxiv.org/abs/1905.07121
 - https://crfm.stanford.edu/2023/03/13/alpaca.html
+- https://developer.nvidia.com/blog/nvidia-ai-red-team-an-introduction
 
 
 ## Lab: Basic Modeling
