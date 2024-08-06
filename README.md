@@ -24,6 +24,10 @@ Gradient Descent
 What is `torch.clamp`?
 Describe what squeeze and unsqueeze are in machine learning.
 Describe how to use `import matplotlib.pyplot as plt` properly in machine learning.
+### Tool Questions
+What is this: `from alibi.explainers import AnchorText`
+What is this: `from alibi.utils import spacy_model`
+How do I use `import zipfile` in Python?
 
 # Need to learn
 Dataset
@@ -456,6 +460,38 @@ Like ART, TextAttack requires input data to be structured a particular way, a li
 
 Instead of the predict function that we used in ART, TextAttack uses the __call__ method to query a model. Otherwise, the mechanics are the same.
 
+Here, we can see the functions the attack is comprised of, this will also print when we run the attack. Faithful to their documentation, we can review the four primary components of an attack module (these should all be familiar sounding)
+
+- Goal function: The goal function determines if the attack is successful or not. One common goal function is untargeted classification, where the attack tries to perturb an input to change its classification.
+- Search method: The search method explores the space of potential transformations and tries to locate a successful perturbation. Greedy search, beam search, and brute-force search are all examples of search methods.
+- Transformation: A transformation takes a text input and transforms it, for example replacing words or phrases with similar ones, while trying not to change the meaning. Paraphrase and synonym substitution are two broad classes of transformations.
+- Constraints: Finally, constraints determine whether or not a given transformation is valid. Transformations don’t perfectly preserve syntax or semantics, so additional constraints can increase the probability that these qualities are preserved. This might include constraints that - overlap constraints that measure edit distance, syntactical constraints check part-of-speech and grammar errors, and semantic constraints. Or even execution contraints that we explored in the malware evasion lab.
+
+### Alibi
+Sample code:
+```
+img = np.moveaxis(unnormalize(img_tensor[0]).numpy(), 0, 2)
+
+explainer = AnchorImage(
+    predict, 
+    image_shape=img.shape,
+    segmentation_fn='slic',
+    segmentation_kwargs={'n_segments': 30, 'compactness': 50, 'sigma': .1, 'start_label': 0,
+                        'channel_axis':-1},
+    images_background=None
+)
+```
+The goal is to understand why a machine learning model makes a particular prediction on an image. To do this, AnchorImage breaks the image up into pieces called superpixels - think of these as little puzzle pieces of the image. It then starts removing or hiding different superpixel pieces of the image, and sees how much that changes the model's prediction.
+
+The superpixel pieces that change the prediction a lot when removed are considered highly "influential" - meaning they contain visual patterns that the model relies on for the prediction. AnchorImage identifies the top most influential superpixel pieces. These influential pieces are called the "anchors" - they anchor the prediction locally to the image. By highlighting these anchor superpixels, we can visualize and understand the patterns in the image that drive the model's decision.
+
+The segmentation_kwargs:
+
+- The image is segmented into 30 superpixels, controlled by n_segments.
+- compactness and sigma affect how cleanly the superpixels are divided.
+- start_label=0 just means the first label for a superpixel is 0.
+- No background images are provided, so influence is calculated against a blank background.
+
 - Optuna (as an attack)
 
 
@@ -575,8 +611,64 @@ No apparent impact to training/validation accuracy: Reduces the chances of detec
 Successful when model trained from scratch or finetuned: Previous methods (like Poison Frogs) only work in finetuning settings.
 Gradient matching is efficient: While it does require a set of trained parameters, generating poisoned images doesn't require training a classifier. This reduces attack cost significantly. "Poisoning ImageNet for a ResNet-18 with MetaPoison would take 500 GPU days vs 4 GPU hours for Witches Brew."
 
+## Persistance
+Poor security controls around model persistance is a frequent opportunity
+Charcuterie
 
-## Relevant Links:
+Pickles are still very persistant and dangerous
+1. Deserialzing untrusted data is extremely dangerous
+2. This is a well know issue across languages
+3. Most "solutions" are ultimately inaffective
+    - Blocklisting
+    - Allowlisting
+Rearchitecting should be the only goal (safetensors, ONNX)
+HuggingFace has a Pickle scanner
+https://github.com/protectai/modelscan
+
+### ONNX - https://github.com/onnx/onnx
+ONNX
+ONNX was developed as an attempt to standardize model files into a format that could be serialized and deserialized by a variety of libraries. You'll find ONNX methods exposed by many common frameworks. There's also a fairly comprehensive model zoo that might come in handy.
+
+Exploiting Onnx is not nearly as simple as pickled formats, however, depending on your goals sometimes you can find interesting operations exposed to ONNX by a library which can be abused or exploited. And when custom opperations are added there may be exploits relating to DLL side loading or by exploiting the logic of the operation itself.
+
+### TensorFlow
+https://www.tensorflow.org/tutorials/keras/save_and_load
+
+By default, Keras uses HDF5. In contexts where the model may be deployed beyond Python (to TFLite or TensorFlow.js, for example), you're likely to find SavedModel objects. The underlying serialization format is protobuf. It's unlikely that this will lead to a compromise baring some other issue, however this also means the models control logic is not part of the format. This may mean it's shared between applications in one of three ways.
+
+Infered from the object
+Shared as code
+It's static
+The third option is likely not going to be a point of failure. However if there is an issue, the seccond would be a fairly standard build pipeline attack most likely, and the first would be an application logic attack.
+
+Tensorflow also suports something called lambda layers which are saved as python byte code. This should not be a reliable way to load the model on a different system. However if one is saved somewhere an attacker can control, and loaded by a system they don't have access to, it could lead to a compromise.
+
+
+# Module 7: LLMs
+
+## Finetuning
+Models receive all words at once today.
+Having the entire text available for analsis helps the model decode ambiguous words and resolve references.
+Models have multiple attention heads (read heads)
+
+Sampling
+- temp - rescale the logits to balance distribution
+- sample - multinomial sample on the distribution
+- top_k - clip distribution to only those top tokens (e.g. top_k=2)
+- beam - step beyond 1 toek to find high prob seq
+- top_p - clip distribution based on cumulative probs
+https://huggingface.co/blog/how-to-generate
+
+Should you even train? Maybe not.
+- Foundation models
+- Instruction-tuned models
+
+## Prompting
+## Poisoning
+## Data Extraction
+
+
+# Relevant Links:
 - http://websocketstest.courses.nvidia.com - Check on the browser and plugins for compatibility
 - learn.nvidia.com - main site
 - http://matrixmultiplication.xyz - for reviewing matrix multiplication
@@ -586,6 +678,12 @@ Gradient matching is efficient: While it does require a set of trained parameter
 - https://developer.nvidia.com/blog/nvidia-ai-red-team-an-introduction
 - https://adversarial-robustness-toolbox.readthedocs.io/en/latest/modules/estimators/classification.html#pytorch-classifier
 - https://arxiv.org/abs/2302.10149
+- https://github.com/moohax/Charcuterie
+- https://github.com/protectai/modelscan
+- https://github.com/onnx/onnx
+- https://www.tensorflow.org/tutorials/keras/save_and_load
+- https://proceedings.neurips.cc/paper/2020/file/8ce6fc704072e351679ac97d4a985574-Paper.pdf
+- https://huggingface.co/blog/how-to-generate
 
 
 ## Lab: Basic Modeling
